@@ -350,8 +350,8 @@ things. The hard limits are enforced outside the model:
     diff, especially when it is flagged as touching sensitive files.
 - Attachments sent by the bot can only come from `state/inbox`, `state/sandbox` or `workspace`. The bot never pings
   @everyone, @here or roles.
-- History lookups (reading and searching past messages) only reach the channels listed in `config/bot.json` and
-  their threads, never other channels the bot account happens to see.
+- History lookups (reading and searching past messages) only reach the chats the bot serves (the channels in
+  `config/bot.json`, their threads, allowed DMs), never other channels the bot account happens to see.
 - Access control (`config/bot.json`) is outside version control and cannot be changed from chat.
 
 Run it on a dedicated machine, VM or user account, not next to sensitive personal data or production credentials.
