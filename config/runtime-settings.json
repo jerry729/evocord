@@ -19,8 +19,6 @@
       "Read(./channel/**)",
       "Read(./tools/**)",
       "Read(./sandbox/**)",
-      "Glob",
-      "Grep",
       "TodoWrite"
     ],
     "deny": [

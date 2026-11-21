@@ -336,8 +336,9 @@ things. The hard limits are enforced outside the model:
   `sandbox.network: "none"` or `sandbox.allow: "admins"` if that matters to you.
 - **Isolated settings.** The session starts with `--setting-sources ""` and only
   [`config/runtime-settings.json`](config/runtime-settings.json): none of your personal Claude Code permissions,
-  hooks, plugins or claude.ai connectors. It can write only `memory/` and `workspace/`. It cannot read the token,
-  `config/bot.json`, `~/.ssh` or `~/.claude*`.
+  hooks, plugins or claude.ai connectors. Its file tools (Read, Grep, Glob) work only inside the bot directory, and
+  not on `config/bot.json`, logs or control state; it can write only `memory/` and `workspace/`. It cannot read the
+  token, `~/.ssh`, `~/.claude*` or anything else on the machine.
 - **Server-side identity checks.** Admin status, who may run code and who may request self-updates are checked
   by the server against Discord data: the author of the referenced message, or the user who clicked the button.
   Message text and tool arguments are never trusted for this.

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.1 — 2026-11-21
+
+- **Security fix: file search could reach outside the bot directory.** The chat session's settings
+  (`config/runtime-settings.json`) allowed the `Grep` and `Glob` tools without a path restriction. A model talked
+  into it by a chat message could search, and so read, files anywhere your user account can read: other projects in
+  your home directory, documents, and so on. The token, `config/bot.json`, `~/.ssh`, `~/.claude*` and `~/.config`
+  were already denied and stayed protected. Both rules are removed, so file search now works only inside the bot
+  directory, with the existing deny rules still applied.
+- A new test fails if an unrestricted `Read`, `Grep` or `Glob` rule comes back.
+
+**Upgrade:** pull, then restart the session (`!bot restart`); the settings are read when the session starts. If
+you edited `config/runtime-settings.json` yourself, delete the `"Glob"` and `"Grep"` entries from `allow` by hand.
+
 ## v0.2.0 — 2026-11-21
 
 - **Daily handoff and fresh session.** Once a day (default after 04:00, once the bot has been idle for 30 minutes;
