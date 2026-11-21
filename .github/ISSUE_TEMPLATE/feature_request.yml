@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest something for upstream evocord
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tip: many features fit better in *your own* instance — just ask your bot to build it (self-update).
+        Upstream is for things most deployments need: core reliability, security, setup, and extension points.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: textarea
+    id: security
+    attributes:
+      label: Security impact
+      description: Does it touch the boundaries in README → Security model (shell, sandbox, permissions, admin checks)?

@@ -1,0 +1,37 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Never paste your bot token, `config/bot.json`, user/channel IDs you want to keep private, or chat transcripts.**
+        Security problems go through [private reporting](https://github.com/jerry729/evocord/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: From state/logs/channel.log and state/logs/supervisor.log (remove IDs and names you don't want public).
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "`claude --version`, `bun --version`, OS (e.g. Ubuntu 24.04 / WSL2), evocord commit or release"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [setup / install, chat & channels, voice, run_code sandbox, self-update, supervisor / restarts, docs, other]

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & show-and-tell
+    url: https://github.com/jerry729/evocord/discussions
+    about: Setup help, ideas, and what your bot evolved into.
+  - name: Report a security vulnerability
+    url: https://github.com/jerry729/evocord/security/advisories/new
+    about: Please report privately, not in a public issue.

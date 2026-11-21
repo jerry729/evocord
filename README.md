@@ -1,15 +1,61 @@
+<p align="center">
+  <img src="docs/assets/social-preview.png" alt="evocord — the Discord bot that writes its own features" width="820">
+</p>
+
+<p align="center">
+  <a href="https://github.com/jerry729/evocord/actions/workflows/ci.yml"><img src="https://github.com/jerry729/evocord/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/jerry729/evocord/releases"><img src="https://img.shields.io/github/v/release/jerry729/evocord" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
+</p>
+
 # evocord
 
-**A self-hosted Discord bot powered by Claude Code that can search the web, understand voice messages, write and
-run code — and rewrite its own source code when your server asks it to.**
+**Your Discord members ask for a feature. The bot writes it, an admin clicks Apply, and it restarts with the
+feature. If the new version breaks, it rolls back by itself.**
 
-evocord connects a long-running [Claude Code](https://code.claude.com) session to Discord through Claude Code's
-[channels](https://code.claude.com/docs/en/channels) feature. Your server members talk to it like any other member;
-it can stay quiet and only chime in when it has something useful to say. When someone asks it for a new feature,
-a separate coding agent writes the change, an admin reviews the diff in Discord and clicks **Apply**, and the bot
-restarts on the new code — rolling back automatically if the new version fails to start.
+evocord is a self-hosted Discord bot built on [Claude Code](https://code.claude.com) and its
+[channels](https://code.claude.com/docs/en/channels) feature. It:
+- chats like a member of your server and can stay quiet until it has something useful to say;
+- searches the web;
+- understands voice messages;
+- runs code in a sandbox and posts the charts and files it makes;
+- grows new abilities when people ask for them.
 
 > evocord is an independent community project. It is not affiliated with or endorsed by Anthropic or Discord.
+
+## See it in action
+
+<!-- demo: replace with docs/assets/demo.gif once recorded -->
+
+*An illustrative transcript of the self-update flow. The message formats are the bot's real ones; a screen
+recording is coming.*
+
+```text
+👤 alice     @evocord add a /roll command, like /roll 2d6
+🤖 evocord   🧬 Self-update job `k3x9` · writing code · 1m12s
+             ✏️ channel/server.ts  ✏️ channel/dice.ts  $ bun test
+🤖 evocord   🧬 Self-update proposal `k3x9` (requested by alice)
+             channel/dice.ts | 61 +++++  channel/server.ts | 24 ++  CLAUDE.md | 2 +
+             Checks: ✅ type check and tests passed        [✅ Apply & restart] [🗑️ Discard]
+👑 admin     *clicks Apply*
+🤖 evocord   ♻️ Merged as `4f2a91c0`, restarting…
+🤖 evocord   ✅ Update `k3x9` is live, now on `4f2a91c0`
+👤 alice     /roll 2d6
+🤖 evocord   🎲 4 + 5 = **9**
+```
+
+Real self-updates from real servers, with the requests, diffs, time and cost: **[Evolution gallery](docs/evolution-gallery.md)**.
+
+## Why evocord
+
+- **The server shapes its own bot.** Ask for a feature in chat and it gets built. Admins review every change as a
+  diff and approve it with one click.
+- **It does things, not just talks.** It runs real code for real answers: numbers, charts, converted files. It reads
+  links, hears voice messages, and remembers your server's conventions.
+- **Built to be poked at.** Anyone in the channel can attempt prompt injection, so the boundaries are enforced outside
+  the model: no shell for the bot, a Docker sandbox for code, server-side permission checks, admin-only apply, and
+  automatic rollback.
+- **Yours.** It runs on your machine with your Claude subscription. Chats, memory and code stay with you.
 
 ## Features
 
@@ -56,6 +102,11 @@ which checks who asked before acting. Architecture details: [DEVELOPING.md](DEVE
 | Disk | ~6 GB with everything (Whisper env + model ≈ 4 GB, sandbox image ≈ 1.4 GB). |
 
 The machine must stay on: the bot is a process on your computer, VM or VPS.
+
+> [!NOTE]
+> Claude Code channels are a **research preview**. Custom channels like evocord's are loaded with
+> `--dangerously-load-development-channels`, and the protocol may change between Claude Code releases. evocord is
+> tested with the version above; if an update breaks it, please open an issue.
 
 ## Setup
 
@@ -319,6 +370,14 @@ python3 -m unittest discover -s tests    # supervisor tests
 
 See [DEVELOPING.md](DEVELOPING.md) for the architecture, how to add tools, and the security invariants that changes
 must keep. Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Community
+
+- Questions, ideas, show-and-tell of what your bot evolved into: [Discussions](https://github.com/jerry729/evocord/discussions)
+- Bugs and feature requests: [Issues](https://github.com/jerry729/evocord/issues). Security problems: see [SECURITY.md](SECURITY.md).
+- Want to help? Look for [good first issues](https://github.com/jerry729/evocord/labels/good%20first%20issue).
+
+If evocord is useful to you, a ⭐ helps other people find it.
 
 ## License
 
