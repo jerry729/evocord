@@ -1,0 +1,6 @@
+faster-whisper>=1.1,<2
+# faster-whisper 1.2 still passes metadata_errors= to av.open, removed in PyAV 15.
+av>=11,<14.3
+# GPU (CUDA 12) runtime libraries for CTranslate2; harmless on CPU-only machines.
+nvidia-cublas-cu12; platform_system == "Linux"
+nvidia-cudnn-cu12>=9,<10; platform_system == "Linux"

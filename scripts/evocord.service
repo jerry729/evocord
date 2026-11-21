@@ -1,0 +1,22 @@
+# systemd user service (alternative to tmux). The supervisor provides the terminal itself.
+# Run ./scripts/start.sh once interactively first (trust dialog / login), then:
+#   mkdir -p ~/.config/systemd/user && cp scripts/evocord.service ~/.config/systemd/user/
+#   # replace /path/to/evocord below
+#   systemctl --user daemon-reload && systemctl --user enable --now evocord
+#   loginctl enable-linger $USER
+[Unit]
+Description=Claude Code Discord bot (self-evolving)
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/evocord
+# Add the directory of node/npx (e.g. ~/.nvm/versions/node/<ver>/bin) if you use the Playwright browser.
+Environment=PATH=%h/.local/bin:%h/.bun/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/path/to/evocord/scripts/start.sh --fg
+ExecStop=/path/to/evocord/scripts/stop.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

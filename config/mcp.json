@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "discord": {
+      "command": "bun",
+      "args": ["channel/server.ts"],
+      "env": {
+        "BOT_SUPERVISED": "${BOT_SUPERVISED:-0}",
+        "BOT_STATE_DIR": "${BOT_STATE_DIR:-}",
+        "BOT_ROOT": "${BOT_ROOT:-}"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@0.0.85", "--browser", "chromium", "--headless", "--isolated", "--output-dir", "./workspace/browser"]
+    }
+  }
+}

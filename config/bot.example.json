@@ -1,0 +1,55 @@
+{
+  "admins": [
+    "<your Discord user ID>"
+  ],
+  "dmAllowFrom": [],
+  "channels": {
+    "<channel ID: answer when @-mentioned>": {
+      "requireMention": true,
+      "allowFrom": []
+    },
+    "<channel ID: read everything, chime in when useful>": {
+      "requireMention": false,
+      "allowFrom": []
+    }
+  },
+  "mentionPatterns": [
+    "^claude[,:\\s]"
+  ],
+  "ackReaction": "👀",
+  "adminPrefix": "!bot",
+  "voice": {
+    "enabled": true,
+    "model": "large-v3-turbo",
+    "device": "auto",
+    "language": null,
+    "initialPrompt": null
+  },
+  "sandbox": {
+    "enabled": true,
+    "network": "bridge",
+    "timeoutSec": 60,
+    "memory": "1g",
+    "cpus": "2",
+    "allow": "everyone"
+  },
+  "evolve": {
+    "enabled": true,
+    "model": null,
+    "timeoutMin": 30,
+    "maxBudgetUsd": null,
+    "autoApply": false,
+    "allow": "admins",
+    "dailyLimit": 5
+  },
+  "catchup": {
+    "enabled": true,
+    "maxAgeMin": 30,
+    "maxMessages": 30
+  },
+  "runtime": {
+    "model": null,
+    "effort": null,
+    "claudeConfigDir": null
+  }
+}

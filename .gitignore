@@ -1,0 +1,12 @@
+# no trailing slash on node_modules/.venv: self-update worktrees use a node_modules symlink
+/node_modules
+/.venv
+/state/
+/config/bot.json
+/workspace/*
+!/workspace/.gitkeep
+/memory/people/*.md
+/memory/channels/*.md
+/memory/topics/*.md
+*.log
+__pycache__/

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "mcp__discord",
+      "mcp__playwright",
+      "WebSearch",
+      "WebFetch",
+      "Read(./memory/**)",
+      "Edit(./memory/**)",
+      "Read(./workspace/**)",
+      "Edit(./workspace/**)",
+      "Read(./state/inbox/**)",
+      "Read(./state/sandbox/**)",
+      "Read(./CLAUDE.md)",
+      "Read(./DEVELOPING.md)",
+      "Read(./README.md)",
+      "Read(./channel/**)",
+      "Read(./tools/**)",
+      "Read(./sandbox/**)",
+      "Glob",
+      "Grep",
+      "TodoWrite"
+    ],
+    "deny": [
+      "Bash",
+      "NotebookEdit",
+      "Read(./config/bot.json)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(./state/history.git/**)",
+      "Read(./state/control/**)",
+      "Read(./state/evolve/**)",
+      "Read(./state/logs/**)",
+      "Edit(./CLAUDE.md)",
+      "Edit(./config/**)",
+      "Edit(./channel/**)",
+      "Edit(./supervisor.py)",
+      "Edit(./scripts/**)",
+      "Edit(./state/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.claude/**)",
+      "Read(~/.claude*/**)",
+      "Read(~/.config/**)",
+      "Read(~/.aws/**)"
+    ]
+  },
+  "enabledPlugins": {
+    "discord@claude-plugins-official": false
+  },
+  "autoMemoryEnabled": false
+}
