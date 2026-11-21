@@ -80,6 +80,16 @@ export type Config = {
     maxAgeMin: number
     maxMessages: number
   }
+  /** Daily handoff + fresh session (see rotate.ts). */
+  rotate: {
+    enabled: boolean
+    /** HH:MM, server local time: rotate once per day after this, when the bot is idle. */
+    at: string
+    /** Only rotate after this many minutes without messages or tool calls. */
+    idleMin: number
+    /** Restart even if the handoff has not finished after this long. */
+    handoffTimeoutMin: number
+  }
   runtime: {
     /** Claude config dir (= which account's subscription) for the session and the self-update agent; null = ~/.claude. */
     claudeConfigDir: string | null
@@ -128,6 +138,12 @@ export const DEFAULTS: Config = {
     maxAgeMin: 30,
     maxMessages: 30,
   },
+  rotate: {
+    enabled: true,
+    at: '04:00',
+    idleMin: 30,
+    handoffTimeoutMin: 10,
+  },
   runtime: { claudeConfigDir: null },
 }
 
@@ -169,6 +185,12 @@ export function normalize(raw: any): Config {
       dailyLimit: Math.max(0, Number(r.evolve?.dailyLimit ?? DEFAULTS.evolve.dailyLimit) || 0),
     },
     catchup: { ...DEFAULTS.catchup, ...(r.catchup ?? {}) },
+    rotate: {
+      enabled: r.rotate?.enabled !== false,
+      at: /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(r.rotate?.at ?? '')) ? String(r.rotate.at) : DEFAULTS.rotate.at,
+      idleMin: Math.max(0, Number(r.rotate?.idleMin ?? DEFAULTS.rotate.idleMin) || 0),
+      handoffTimeoutMin: Math.max(1, Number(r.rotate?.handoffTimeoutMin ?? DEFAULTS.rotate.handoffTimeoutMin) || DEFAULTS.rotate.handoffTimeoutMin),
+    },
     runtime: {
       claudeConfigDir: typeof r.runtime?.claudeConfigDir === 'string' && r.runtime.claudeConfigDir
         ? r.runtime.claudeConfigDir.replace(/^~(?=\/|$)/, homedir())

@@ -47,6 +47,12 @@
     "maxAgeMin": 30,
     "maxMessages": 30
   },
+  "rotate": {
+    "enabled": true,
+    "at": "04:00",
+    "idleMin": 30,
+    "handoffTimeoutMin": 10
+  },
   "runtime": {
     "model": null,
     "effort": null,

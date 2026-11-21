@@ -70,7 +70,15 @@ Real self-updates from real servers, with the requests, diffs, time and cost: **
   file conversion (ffmpeg), API calls. Generated files are posted back to the chat.
 - 🧬 **Self-evolution** — "add a command that …" → coding agent → diff + Apply/Discard buttons → restart → automatic
   rollback on failure. Members can propose; admins approve.
-- 🧠 **Long-term memory** — Markdown notes about people, channels and topics.
+- 🧠 **Long-term memory** — Markdown notes about people, channels and topics. It keeps what will still matter next
+  week (nicknames, preferences, server conventions, promises) and skips small talk and time-sensitive answers.
+- 🗂️ **Searchable chat history** — when someone mentions something the bot doesn't remember ("the pizza place from
+  yesterday", a message link, "what did Sam say about the trip last week"), it searches the channel's Discord
+  history by keyword, person or date, reads the surrounding conversation and answers from the original messages.
+- 🌅 **A fresh start every day** — once a day, when the server has gone quiet, the bot files what's worth keeping
+  into memory, writes a handoff note for its successor and starts a fresh session that opens with that note.
+  Yesterday's chatter doesn't pile up, so answers stay focused and per-message cost stays flat.
+  [More below](#daily-handoff).
 - ♻️ **Resilient** — a supervisor restarts the session, resumes the conversation, and catches up on messages missed
   during restarts.
 - 🛡️ **Least privilege** — no shell for the chat model, server-side permission checks, tokens kept out of reach.
@@ -241,7 +249,8 @@ model, so they work even if the model or its prompt is broken.
 | --- | --- |
 | `!bot status` | version, uptime, enabled features, running / pending self-update jobs |
 | `!bot restart` | restart the Claude session (conversation context kept) |
-| `!bot reset` | restart with a fresh conversation (memory files kept) |
+| `!bot reset` | restart with a fresh conversation, no handoff (memory files kept) |
+| `!bot rotate` | run the [daily handoff](#daily-handoff) now: save what matters, write a handoff note, start fresh |
 | `!bot evolve <request>` | start a self-update without going through the model |
 | `!bot jobs` · `!bot diff <id>` | list jobs · fetch a proposal's diff |
 | `!bot apply <id>` · `!bot discard <id>` | same as the buttons |
@@ -277,12 +286,40 @@ model, so they work even if the model or its prompt is broken.
 | `evolve.timeoutMin` / `maxBudgetUsd` | `30` / `null` | Limits per agent run |
 | `evolve.autoApply` | `false` | Apply admin-requested proposals without a click when checks pass and nothing sensitive changed |
 | `catchup.enabled` / `maxAgeMin` / `maxMessages` | `true` / `30` / `30` | Deliver messages missed during restarts |
+| `rotate.enabled` | `true` | [Daily handoff](#daily-handoff) and fresh session; `false` keeps one ever-growing conversation |
+| `rotate.at` | `"04:00"` | Earliest time of day for the handoff (the server's local time) |
+| `rotate.idleMin` | `30` | Wait until the bot has been quiet this long, so nobody is cut off mid-conversation |
+| `rotate.handoffTimeoutMin` | `10` | Start the fresh session anyway if the handoff takes longer |
 | `runtime.model` / `effort` | `null` | Model and effort for the chat session, e.g. `"claude-opus-5-5"`, `"high"` |
 | `runtime.claudeConfigDir` | `null` | Claude config dir (= account) for the bot; `null` = `~/.claude` |
 
 Other files you may want to edit: [`CLAUDE.md`](CLAUDE.md), the bot's persona and rules, and
 [`sandbox/Dockerfile`](sandbox/Dockerfile), the packages available to `run_code`. Members can also ask the bot to
 change either through self-evolution.
+
+### Daily handoff
+
+A bot that never stops talking accumulates a huge conversation: every new message drags all of the old ones along,
+answers get distracted by last week's jokes, and each reply costs more than the one before. evocord gives its bot a
+fresh start every day instead, without making it forget what matters.
+
+Every day after 4 am, once the server has been quiet for half an hour (an active conversation postpones it):
+1. **Keep what matters.** The bot goes through the day and saves what will still matter in a week, such as
+   nicknames, preferences, server conventions, promises it made, and bills nobody has split yet. It drops small talk,
+   games, weather, prices and one-off questions, and tidies out memory entries that are done or out of date.
+2. **Write a handoff note** for its successor: what happened, where each conversation stopped, and who is waiting
+   for an answer.
+3. **Start fresh.** A new session begins with the handoff note as its first message and reads memory before anything
+   else.
+
+An example from a test run. The day's chat included a nickname request, a weather question, a typing race, a
+promise to remind someone about rent on Monday, and a dinner bill that hadn't been split. The next morning's
+session knew about the nickname, the rent reminder and the open bill, and nothing else.
+
+Nothing is really lost: details that didn't make it into memory, like "that pizza place from yesterday", are still in
+the channel's history, and the bot searches it when someone brings them up. Admins can run the handoff at any time
+with `!bot rotate`. The schedule is configurable, and `rotate.enabled: false` turns it off
+(see the [configuration reference](#configuration-reference)).
 
 ## Security model
 
@@ -313,6 +350,8 @@ things. The hard limits are enforced outside the model:
     diff, especially when it is flagged as touching sensitive files.
 - Attachments sent by the bot can only come from `state/inbox`, `state/sandbox` or `workspace`. The bot never pings
   @everyone, @here or roles.
+- History lookups (reading and searching past messages) only reach the channels listed in `config/bot.json` and
+  their threads, never other channels the bot account happens to see.
 - Access control (`config/bot.json`) is outside version control and cannot be changed from chat.
 
 Run it on a dedicated machine, VM or user account, not next to sensitive personal data or production credentials.
@@ -324,7 +363,9 @@ All usage counts against the Claude account the bot is logged in with:
 - every tool call;
 - every self-update agent run.
 
-Use a cheaper `runtime.model`, `requireMention: true` and a low `evolve.dailyLimit` to keep it in check. A separate
+Use a cheaper `runtime.model`, `requireMention: true` and a low `evolve.dailyLimit` to keep it in check. The
+[daily handoff](#daily-handoff) keeps the conversation from growing beyond about a day, so per-message cost stays
+steady instead of creeping up. A separate
 account via `runtime.claudeConfigDir` keeps the bot from eating into your own quota.
 
 ## Operations

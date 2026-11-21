@@ -35,6 +35,8 @@ them. The model answers by calling the server's tools (`reply`, ...).
 | `channel/voice.ts` | Transcription queue around `tools/transcribe.py`. |
 | `channel/sandbox.ts` | `run_code` Docker invocation, file allowlist for attachments. |
 | `channel/evolve.ts` | Self-update pipeline: history repo, worktrees, agent run, checks, apply, rollback. |
+| `channel/history.ts` | Helpers for `fetch_messages` / `search_messages`: message links, date → snowflake bounds, Search Guild Messages query, line format. |
+| `channel/rotate.ts` | Daily handoff + fresh session: schedule decision (`decide`), `state/rotate.json`. Wiring (handoff/kickoff prompts, `session_handoff` tool, `!bot rotate`) is in `server.ts`. |
 | `channel/control.ts` | Files shared with the supervisor (`state/update.json`, `state/control/restart.json`). |
 | `channel/proc.ts` | Subprocess helper (no shell, timeouts), environment scrubbing. |
 | `supervisor.py` | Process supervisor (stdlib only). Not restarted by self-updates. |

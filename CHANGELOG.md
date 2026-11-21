@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.2.0 — 2026-11-21
+
+- **Daily handoff and fresh session.** Once a day (default after 04:00, once the bot has been idle for 30 minutes;
+  new messages postpone it) the bot saves what matters to memory, writes a handoff note and restarts with a fresh
+  session that opens with that note. The context no longer grows without bound, so per-message cost stays flat.
+  - New admin command `!bot rotate` runs it on demand; `!bot reset` still starts fresh without a handoff.
+  - `!bot status` shows when the session last started fresh.
+  - New config section `rotate` (`enabled`, `at`, `idleMin`, `handoffTimeoutMin`).
+- **Searchable chat history.** New `search_messages` tool built on Discord's Search Guild Messages API (keywords,
+  author, date range, attachment type). `fetch_messages` can now load the conversation around a message, page
+  through history by message id or date, and open message links. Memory entries and handoff notes keep message ids
+  so details can be reloaded later.
+- **Stricter memory rules** in `CLAUDE.md`: save only what will still matter in a week (nicknames, preferences,
+  conventions, promises); skip small talk, games, weather, prices and one-off questions.
+
 ## v0.1.0 — 2026-11-21
 
 First public release.
