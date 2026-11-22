@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { mayEvolve, mayRunCode, normalize } from './config'
-import { allowedChat, gate, parseAdminCommand, type Inbound } from './gate'
+import { allowedChat, gate, gateReaction, parseAdminCommand, type Inbound } from './gate'
 
 const cfg = normalize({
   admins: ['100000000000000001'],
@@ -15,6 +15,25 @@ const cfg = normalize({
 const msg = (o: Partial<Inbound>): Inbound => ({
   authorId: '100000000000000009', isDM: false, channelId: '200000000000000001', parentId: null,
   mentionsBot: false, repliesToBot: false, content: 'hi', ...o,
+})
+
+describe('gateReaction', () => {
+  const r = (o: Partial<Parameters<typeof gateReaction>[0]>) => ({
+    reactorId: '100000000000000009', isDM: false, channelId: '200000000000000001', parentId: null, onBotMessage: false, ...o,
+  })
+  test('requireMention channels: only reactions on the bot\'s messages', () => {
+    expect(gateReaction(r({}), cfg).deliver).toBe(false)
+    expect(gateReaction(r({ onBotMessage: true }), cfg).deliver).toBe(true)
+  })
+  test('allowFrom and unconfigured channels apply to the reactor', () => {
+    expect(gateReaction(r({ channelId: '200000000000000002' }), cfg).deliver).toBe(false)
+    expect(gateReaction(r({ channelId: '200000000000000002', reactorId: '100000000000000003' }), cfg).deliver).toBe(true)
+    expect(gateReaction(r({ channelId: '299999999999999999', onBotMessage: true }), cfg).deliver).toBe(false)
+  })
+  test('DMs: only allowlisted reactors, admin flag set', () => {
+    expect(gateReaction(r({ isDM: true }), cfg).deliver).toBe(false)
+    expect(gateReaction(r({ isDM: true, reactorId: '100000000000000001' }), cfg)).toEqual({ deliver: true, mentioned: true, admin: true })
+  })
 })
 
 describe('gate', () => {

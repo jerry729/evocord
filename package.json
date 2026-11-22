@@ -1,6 +1,6 @@
 {
   "name": "evocord",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Self-hosted Discord bot on Claude Code channels: web search, voice messages, sandboxed code execution and self-evolution.",
   "license": "Apache-2.0",
   "private": true,

@@ -79,6 +79,10 @@ export type Line = {
   attachments: number
   voice?: string | null
   chatId?: string
+  /** Reaction summary, e.g. "👍×2 ✅×1" (see reactions.ts). */
+  reactions?: string
+  /** Poll summary (see poll.ts). */
+  poll?: string
 }
 
 /** "2026-11-21 20:15" in server local time. */
@@ -89,5 +93,7 @@ export function formatLine(l: Line, maxLen = 500): string {
   if (body.length > maxLen) body = body.slice(0, maxLen) + '…'
   const voice = l.voice !== undefined ? ` [voice: ${l.voice ?? 'not transcribed — use transcribe'}]` : ''
   const att = l.attachments ? ` +${l.attachments}att` : ''
-  return `[${localStamp(l.ts)}] ${l.author}: ${body}${voice}  (id: ${l.id}${l.chatId ? ` · chat ${l.chatId}` : ''}${att})`
+  const reacts = l.reactions ? ` [reactions: ${l.reactions}]` : ''
+  const poll = l.poll ? ` [poll: ${l.poll}]` : ''
+  return `[${localStamp(l.ts)}] ${l.author}: ${body}${voice}${poll}${reacts}  (id: ${l.id}${l.chatId ? ` · chat ${l.chatId}` : ''}${att})`
 }

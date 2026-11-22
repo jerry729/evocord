@@ -4,9 +4,10 @@
  * --dangerously-load-development-channels server:discord).
  *
  * Inbound: Discord gateway → gate() → (voice: download + transcribe) → <channel> event.
- * Tools:   reply, react, edit_message, fetch_messages, search_messages (history.ts), download_attachment,
- *          transcribe, run_code (Docker sandbox), self_update (admin-only evolution),
- *          session_handoff (daily rotation, see rotate.ts).
+ * Tools:   reply (text, files, native polls via poll.ts), react, edit_message, fetch_messages,
+ *          search_messages (history.ts), download_attachment, transcribe, run_code (Docker sandbox),
+ *          self_update (admin-only evolution), session_handoff (daily rotation, see rotate.ts).
+ * Events:  messages, plus emoji reactions (batched per message, see reactions.ts).
  * Admin:   "!bot <cmd>" messages from admins are handled here, never shown to the model,
  *          so restart / rollback still work when the model or its prompt is broken.
  */
@@ -16,6 +17,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, GatewayIntentBits,
   MessageFlags, MessageType, Partials, type Attachment, type Interaction, type Message,
+  type MessageReaction, type PartialMessageReaction, type PartialUser, type User,
 } from 'discord.js'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -30,9 +32,11 @@ import {
   recoverInterrupted, removeWorktree, resetTo, runAgent, runChecks, runChecksSandboxed, runningJob, saveJob, agentPrompt,
   ensureRepo,
 } from './evolve'
-import { allowedChat, gate, parseAdminCommand, type Inbound } from './gate'
+import { allowedChat, gate, gateReaction, parseAdminCommand, type Inbound } from './gate'
 import * as rotation from './rotate'
-import { type SearchInput, formatLine, parseMessageLink, searchParams, snowflakeTime, toBound } from './history'
+import { type SearchInput, formatLine, localStamp, parseMessageLink, searchParams, snowflakeTime, toBound } from './history'
+import { type PollView, fetchAllVoters, parsePoll, pollSummary } from './poll'
+import { type ReactionChange, ReactionBatcher, describeChanges, reactionSummary } from './reactions'
 import { killAllChildren, run } from './proc'
 import { pruneOld, runCode, underAllowedRoot } from './sandbox'
 import { chunk, metaValue, safeName, truncateMiddle } from './text'
@@ -65,8 +69,13 @@ const firstLine = (s: string, n = 60) => (s.split('\n').find(l => l.trim()) ?? '
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages],
-  partials: [Partials.Channel], // DMs arrive as partial channels
+  intents: [
+    GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.DirectMessageReactions,
+    GatewayIntentBits.GuildMessagePolls, GatewayIntentBits.DirectMessagePolls,
+  ],
+  // DMs arrive as partial channels; Message/Reaction/User partials deliver reactions on uncached (older) messages.
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User],
   allowedMentions: { parse: ['users'], repliedUser: false },
 })
 
@@ -188,8 +197,26 @@ const str = { type: 'string' } as const
 const TOOLS = [
   {
     name: 'reply',
-    description: 'Send a message to a Discord chat. Long text is split automatically. files: absolute paths under state/inbox, state/sandbox or workspace (max 10, 25MB each). reply_to quotes a message.',
-    inputSchema: { type: 'object', properties: { chat_id: str, text: str, reply_to: str, files: { type: 'array', items: str } }, required: ['chat_id', 'text'] },
+    description: 'Send a message to a Discord chat. Long text is split automatically. files: absolute paths under state/inbox, state/sandbox or workspace (max 10, 25MB each). reply_to quotes a message. ' +
+      'poll: attach a native Discord poll (2–10 distinct answers, question ≤300 chars, answer ≤55 chars, duration_hours 1–768, default 24); text may be empty then. ' +
+      'Read the current tally later with fetch_messages message_id=<poll message id>.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        chat_id: str, text: str, reply_to: str, files: { type: 'array', items: str },
+        poll: {
+          type: 'object',
+          properties: {
+            question: str,
+            answers: { type: 'array', items: { type: 'object', properties: { text: str, emoji: str }, required: ['text'] }, minItems: 2, maxItems: 10 },
+            duration_hours: { type: 'number' },
+            allow_multiselect: { type: 'boolean' },
+          },
+          required: ['question', 'answers'],
+        },
+      },
+      required: ['chat_id', 'text'],
+    },
   },
   {
     name: 'react',
@@ -207,7 +234,8 @@ const TOOLS = [
       'Read chat history, oldest first, with message ids, user ids, attachment counts and voice transcripts. Default: the latest ' +
       'messages. around: a message id (e.g. a search_messages hit) or a time → the conversation around it. before / after: a ' +
       'message id or date (YYYY-MM-DD / ISO time) to page through older / newer messages. message_id, or link (a Discord message ' +
-      'link; chat_id is then taken from it): one specific message; add context=N for N messages on each side.',
+      'link; chat_id is then taken from it): one specific message; add context=N for N messages on each side. Lines show ' +
+      'reactions as emoji×count; for one specific message also who reacted.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -343,13 +371,16 @@ async function toolReply(a: Record<string, any>): Promise<string> {
     if (!underAllowedRoot(f)) throw new Error(`refusing to send ${f}: only files under state/inbox, state/sandbox or workspace can be attached`)
     if (statSync(f).size > MAX_ATTACHMENT) throw new Error(`file too large: ${f}`)
   }
+  const poll = a.poll != null ? parsePoll(a.poll) : null
   const parts = chunk(String(a.text ?? ''), loadConfig().textChunkLimit)
+  if (poll && !parts.length) parts.push('')
   const ids: string[] = []
   try {
     for (let i = 0; i < parts.length; i++) {
       const sent = await ch.send({
-        content: parts[i],
+        ...(parts[i] ? { content: parts[i] } : {}),
         ...(i === 0 && files.length ? { files } : {}),
+        ...(i === parts.length - 1 && poll ? { poll } : {}),
         ...(i === 0 && a.reply_to ? { reply: { messageReference: String(a.reply_to), failIfNotExists: false } } : {}),
         allowedMentions: { parse: ['users'], repliedUser: false },
       })
@@ -374,7 +405,8 @@ async function toolFetch(a: Record<string, any>): Promise<string> {
   const context = clampInt(a.context, 0, 50, 0)
   let msgs: Message[]
   if (target && !context) {
-    msgs = [await ch.messages.fetch(target)]
+    // force: the cached copy (e.g. a poll the bot just sent) can be stale — always ask Discord.
+    msgs = [await ch.messages.fetch({ message: target, force: true })]
   } else {
     const opts: Record<string, unknown> = { limit: target ? context * 2 + 1 : clampInt(a.limit, 1, 100, 20) }
     if (target) opts.around = target
@@ -385,14 +417,63 @@ async function toolFetch(a: Record<string, any>): Promise<string> {
   }
   if (!msgs.length) return '(no messages)'
   const me = client.user?.id
-  return msgs.map(m => (m.id === target && msgs.length > 1 ? '→ ' : '') + formatLine({
+  const single = msgs.length === 1
+  const lines = await Promise.all(msgs.map(async m => (m.id === target && msgs.length > 1 ? '→ ' : '') + formatLine({
     id: m.id,
     ts: m.createdTimestamp,
     author: m.author.id === me ? 'me' : `${m.author.username}(${m.author.id})`,
     content: m.content,
     attachments: m.attachments.size,
     voice: isVoice(m) ? (transcripts.get(m.id) ?? null) : undefined,
-  }, 2000)).join('\n')
+    reactions: await reactionsOf(m, single) || undefined,
+    poll: await pollOf(m, single),
+  }, 2000)))
+  return lines.join('\n')
+}
+
+/**
+ * Question, answers with vote counts and end time of a native poll on the message.
+ * `live` (single message): counts come from the Get Answer Voters endpoint and list who voted, because
+ * the message's own answer counts are only as fresh as the last fetch / poll gateway event.
+ */
+async function pollOf(m: Message, live: boolean): Promise<string | undefined> {
+  const p = m.poll
+  if (!p) return undefined
+  const me = client.user?.id
+  const answers = await Promise.all([...p.answers.values()].map(async x => {
+    const a: PollView['answers'][number] = { text: x.text ?? '', emoji: x.emoji ? emojiText(x.emoji) : undefined, votes: x.voteCount ?? 0 }
+    if (!live) return a
+    try {
+      const { voters, complete } = await fetchAllVoters(async after => [...(await x.voters.fetch({ limit: 100, ...(after ? { after } : {}) })).values()])
+      a.votes = complete ? voters.length : Math.max(a.votes, voters.length)
+      a.voters = voters.map(u => (u.id === me ? 'me' : `${u.username}(${u.id})`))
+    } catch {}
+    return a
+  }))
+  return pollSummary({
+    question: p.question.text ?? '',
+    answers,
+    multiselect: p.allowMultiselect,
+    expiresAt: p.expiresTimestamp,
+    finalized: p.resultsFinalized,
+  }, localStamp)
+}
+
+const emojiText = (e: { id: string | null; name: string | null }) => (e.id ? `:${safeName(e.name ?? 'emoji')}:` : (e.name ?? '?'))
+
+/** Reaction summary of a message; `withUsers` also lists who reacted (one API call per emoji, so only for single messages). */
+async function reactionsOf(m: Message, withUsers: boolean): Promise<string> {
+  const me = client.user?.id
+  const rs = [...m.reactions.cache.values()]
+  return reactionSummary(await Promise.all(rs.map(async (r, i) => {
+    let users: string[] | undefined
+    if (withUsers && i < 10) {
+      try {
+        users = [...(await r.users.fetch({ limit: 10 })).values()].map(u => (u.id === me ? 'me' : `${u.username}(${u.id})`))
+      } catch {}
+    }
+    return { emoji: emojiText(r.emoji), count: r.count ?? 0, me: r.me, users }
+  })))
 }
 
 async function toolSearch(a: Record<string, any>): Promise<string> {
@@ -962,6 +1043,65 @@ client.on('messageCreate', (msg: Message) => {
   if (msg.type !== MessageType.Default && msg.type !== MessageType.Reply) return
   handleInbound(msg).catch(e => log('handleInbound failed', e))
 })
+
+// ------------------------------------------------------------------ reactions (see reactions.ts)
+
+/** Reacted-to message details, kept until its batch is flushed. */
+const reactedMsgs = new Lru<{ mine: boolean; author: string; authorId: string; text: string }>(300)
+
+const reactionBatcher = new ReactionBatcher((chatId: string, messageId: string, changes: ReactionChange[]) => {
+  if (rot.restarting) return
+  const info = reactedMsgs.get(messageId)
+  const meta: Record<string, string> = { kind: 'reaction', chat_id: chatId, message_id: messageId, ts: new Date().toISOString() }
+  if (info) {
+    meta.message_author = info.mine ? 'me' : info.author
+    meta.message_author_id = info.authorId
+    if (info.text) meta.message_text = metaValue(info.text, 200)
+  }
+  if (changes.length === 1) {
+    const c = changes[0]
+    Object.assign(meta, { user: c.user, user_id: c.userId, display_name: metaValue(c.displayName, 60), emoji: metaValue(c.emoji, 60), action: c.added ? 'added' : 'removed' })
+    if (c.admin) meta.is_admin = 'true'
+  } else {
+    meta.user_ids = [...new Set(changes.map(c => c.userId))].join(',')
+    const admins = [...new Set(changes.filter(c => c.admin).map(c => c.userId))]
+    if (admins.length) meta.admin_user_ids = admins.join(',')
+  }
+  const whose = !info ? 'a message' : info.mine ? 'your message' : `${info.author}'s message`
+  const content = `(reaction on ${whose}) ${describeChanges(changes)}`
+  void mcp.notification({ method: 'notifications/claude/channel', params: { content, meta } }).catch(e => log('reaction notify failed', e))
+})
+
+async function handleReaction(reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser, added: boolean): Promise<void> {
+  if (rot.restarting) return
+  const me = client.user?.id
+  if (!me || user.id === me) return
+  const cfg = loadConfig()
+  const partialMsg = reaction.message
+  const ch: AnyChannel = partialMsg.channel ?? (await client.channels.fetch(partialMsg.channelId).catch(() => null))
+  if (!ch) return
+  const chat = chatOf(ch)
+  // Cheap pre-check before fetching anything for chats the bot does not serve.
+  if (!allowedChat(cfg, { ...chat, dmUserId: chat.isDM ? user.id : null })) return
+  const u = user.partial ? await user.fetch() : user
+  if (u.bot) return
+  const msg = partialMsg.partial ? await partialMsg.fetch() : partialMsg
+  const onBotMessage = msg.author.id === me || sentIds.has(msg.id)
+  const v = gateReaction({ reactorId: u.id, isDM: chat.isDM, channelId: chat.channelId, parentId: chat.parentId, onBotMessage }, cfg)
+  if (!v.deliver) return
+  const member = msg.guild ? await msg.guild.members.fetch(u.id).catch(() => null) : null
+  reactedMsgs.set(msg.id, {
+    mine: onBotMessage, author: msg.author.username, authorId: msg.author.id,
+    text: msg.content || (msg.attachments.size ? '(attachment)' : ''),
+  })
+  reactionBatcher.add({
+    chatId: msg.channelId, messageId: msg.id, userId: u.id, user: u.username,
+    displayName: member?.displayName ?? u.globalName ?? u.username, emoji: emojiText(reaction.emoji), added, admin: v.admin,
+  })
+}
+
+client.on('messageReactionAdd', (r, u) => { handleReaction(r, u, true).catch(e => log('reaction failed', e)) })
+client.on('messageReactionRemove', (r, u) => { handleReaction(r, u, false).catch(e => log('reaction failed', e)) })
 
 // ------------------------------------------------------------------ daily rotation (see rotate.ts)
 

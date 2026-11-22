@@ -10,8 +10,9 @@
       }
     },
     "playwright": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@0.0.85", "--browser", "chromium", "--headless", "--isolated", "--output-dir", "./workspace/browser"]
+      "command": "bun",
+      "args": ["channel/browser-proxy.ts", "--idle-min", "${BROWSER_IDLE_MIN:-10}", "--",
+               "npx", "-y", "@playwright/mcp@0.0.85", "--browser", "chromium", "--headless", "--isolated", "--output-dir", "./workspace/browser"]
     }
   }
 }

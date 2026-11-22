@@ -37,6 +37,20 @@ export function gate(m: Inbound, cfg: Config): Verdict {
   return { deliver: true, mentioned, admin }
 }
 
+/**
+ * Same rules as gate() for an emoji reaction: the reactor must be allowed to reach the bot in this chat. In
+ * channels that require a mention, only reactions on the bot's own messages count (like a reply to the bot).
+ */
+export function gateReaction(
+  r: { reactorId: string; isDM: boolean; channelId: string; parentId: string | null; onBotMessage: boolean },
+  cfg: Config,
+): Verdict {
+  return gate({
+    authorId: r.reactorId, isDM: r.isDM, channelId: r.channelId, parentId: r.parentId,
+    mentionsBot: false, repliesToBot: r.onBotMessage, content: '',
+  }, cfg)
+}
+
 export function matchesPattern(text: string, patterns: string[]): boolean {
   for (const p of patterns) {
     try {

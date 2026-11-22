@@ -15,7 +15,8 @@ supervisor.py (pty, restarts, rollback)
     │     ├── voice.ts    → .venv/bin/python tools/transcribe.py   (faster-whisper)
     │     ├── sandbox.ts  → docker run evocord-sandbox           (run_code)
     │     └── evolve.ts   → claude -p in a git worktree             (self_update)
-    └── MCP "playwright" (headless browser)
+    └── MCP "playwright" = bun channel/browser-proxy.ts -- npx @playwright/mcp   (headless browser;
+                           the proxy closes it after BROWSER_IDLE_MIN minutes without tool calls, default 10)
 ```
 
 The channel server pushes each Discord message into the session as a
@@ -35,6 +36,9 @@ them. The model answers by calling the server's tools (`reply`, ...).
 | `channel/voice.ts` | Transcription queue around `tools/transcribe.py`. |
 | `channel/sandbox.ts` | `run_code` Docker invocation, file allowlist for attachments. |
 | `channel/evolve.ts` | Self-update pipeline: history repo, worktrees, agent run, checks, apply, rollback. |
+| `channel/browser-proxy.ts` | Stdio proxy in front of Playwright MCP: forwards everything, sends `browser_close` after the idle timeout (`--idle-min`, env `BROWSER_IDLE_MIN`; 0 = off). Never closes while a call is in flight. |
+| `channel/reactions.ts` | Emoji reactions: per-message batching (`ReactionBatcher`, add+remove cancel out) into `kind="reaction"` notifications, reaction summaries for `fetch_messages`. Access check is `gateReaction` in `gate.ts`. |
+| `channel/poll.ts` | Native polls: `reply(poll)` validation (`parsePoll`: 2–10 answers, 1–768 h, lengths) and the `[poll: ...]` tally line for `fetch_messages` (single-message fetches count votes live via `fetchAllVoters` / Get Answer Voters and list voters; cached `voteCount` is stale for polls the bot sent). |
 | `channel/history.ts` | Helpers for `fetch_messages` / `search_messages`: message links, date → snowflake bounds, Search Guild Messages query, line format. |
 | `channel/rotate.ts` | Daily handoff + fresh session: schedule decision (`decide`), `state/rotate.json`. Wiring (handoff/kickoff prompts, `session_handoff` tool, `!bot rotate`) is in `server.ts`. |
 | `channel/control.ts` | Files shared with the supervisor (`state/update.json`, `state/control/restart.json`). |

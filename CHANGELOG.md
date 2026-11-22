@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.3.0 — 2026-11-22
+
+Three features the bot wrote for itself: group members asked for them in chat, the self-update agent made the
+changes, and an admin applied them. They are upstreamed here with only small adjustments.
+
+- **Native Discord polls.** `reply` takes an optional `poll` (question, 2–10 answers with optional emoji, duration
+  1–768 hours, default 24, single or multiple choice), so the bot can open a poll when the group needs to decide.
+  `fetch_messages` on a poll message shows the live tally and who voted for what; the first version read the
+  cached counts, which stay stale for polls the bot sent itself, and the group's bug report led to the fix.
+- **Emoji reactions reach the model.** Reactions arrive as `kind="reaction"` events, with reactions on the same
+  message within a few seconds merged into one event and an add followed by a remove cancelling out. The same
+  access rules as messages apply; in channels with `requireMention: true` only reactions on the bot's own messages
+  count. The model stays quiet on them by default and uses them when they clearly answer something it asked (e.g. ✅
+  to confirm). `fetch_messages` lines now show reactions, and for a single message who reacted.
+- **The headless browser closes when idle.** Playwright MCP now runs behind a small stdio proxy
+  (`channel/browser-proxy.ts`) that closes the browser after 10 minutes without browser tool calls; it reopens on
+  the next call, and calls still in progress are never interrupted. Set `BROWSER_IDLE_MIN` to change the timeout
+  (0 turns it off).
+
+**Upgrade:** pull, then restart the bot (`!bot restart`): the new gateway intents and `config/mcp.json` are read at
+startup. The reaction and poll intents are not privileged, so nothing changes in the Developer Portal. If you edited
+`config/mcp.json`, wrap your `playwright` command the same way (`bun channel/browser-proxy.ts --idle-min 10 -- npx
+...`). Polls need the Send Polls permission, which `@everyone` has by default; if a server removed it, give it to the
+bot's role.
+
 ## v0.2.1 — 2026-11-21
 
 - **Security fix: file search could reach outside the bot directory.** The chat session's settings
